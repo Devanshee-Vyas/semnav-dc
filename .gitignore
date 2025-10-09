@@ -50,10 +50,12 @@ checkpoints/
 *.pth
 *.pt
 
-# Logs and Results
-logs/
-results/
-docs/figures/
+# Logs and Results (allow selective files for portfolio)
+logs/*.log
+results/*.png
+results/*.jpg
+results/*sample_*.png
+# Keep: results/*.md, logs/*.csv, docs/figures/*.png (for documentation)
 
 # OS
 .DS_Store
