@@ -1,0 +1,24 @@
+dataset_name: ss4blind
+data_root: data/ss4blind
+splits_dir: data/ss4blind/splits
+train_csv: train.csv
+val_csv: val.csv
+test_csv: test.csv
+image_size: [480, 640]
+sparse_points: 800
+batch_size: 2
+num_workers: 0
+epochs: 5
+lr: 0.001
+weight_decay: 0.0001
+amp: true
+model: semnav_dc
+loss:
+  l1: 1.0
+  grad: 0.5
+  ssim: 0.2
+  boundary_iou: 0.2
+  freespace_bce: 0.5
+exp_name: ss4blind_semnav
+save_every: 2
+viz_every: 2

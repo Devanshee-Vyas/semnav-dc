@@ -1,0 +1,17 @@
+﻿timm
+albumentations
+opencv-python>=4.8
+einops
+scipy
+scikit-image
+scikit-learn
+matplotlib>=3.8
+pillow>=10.0
+tqdm>=4.66
+pyyaml>=6.0
+python-pptx
+h5py
+requests
+numpy>=2.1.0
+pandas>=2.2
+tifffile>=2024.8.30
