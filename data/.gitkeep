@@ -1,5 +1,0 @@
-# Data directory
-# This directory will contain:
-# - raw/: Downloaded NYU Depth V2 MAT file
-# - nyu/: Prepared full dataset
-# - nyu_mini/: Mini split for fast prototyping
