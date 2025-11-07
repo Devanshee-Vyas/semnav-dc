@@ -1,235 +1,266 @@
-# SemNav-DC: Semantic Depth Completion for Blind Navigation
+# 🧭 SemNav-DC Baseline — UNet Depth Completion for Assistive Navigation
 
-Deep Learning course project implementing semantic-guided sparse depth completion for assistive navigation systems.
-
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-orange.svg)](https://pytorch.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+Baseline implementation of **semantic-guided sparse depth completion** for assistive navigation systems.  
+This repository reproduces the **UNet baseline** on the combined **SS4Blind + ARKitScenes** dataset, generating dense depth maps from RGB and sparse depth inputs.
 
 ---
 
-## Overview
+## 🚀 Overview
 
-This project addresses depth completion for visually impaired navigation by combining semantic segmentation with sparse depth measurements. We demonstrate that semantic object understanding improves depth edge accuracy, which is critical for obstacle detection in assistive navigation systems.
+This project provides a complete end-to-end pipeline for:
 
-**Key Features:**
-- Semantic-guided depth completion architecture (SemNav-DC)
-- Navigation-specific evaluation metrics (Free Space IoU, Obstacle Recall)
-- Boundary-aware loss functions for sharp edge preservation
-- Trained and evaluated on real-world SS4Blind navigation dataset
-
----
-
-## Architecture
-
-### Baseline: UNet with Multi-Scale Features
-
-- **Encoder:** ResNet-34 (pretrained on ImageNet)
-- **Input:** 5 channels (RGB + sparse depth + validity mask)
-- **Decoder:** 4-level upsampling with skip connections
-- **Output:** Dense depth map
-
-### Advanced: SemNav-DC
-
-- **Semantic Branch:** Frozen DeepLabV3 for semantic features
-- **Geometric Branch:** UNet baseline for depth processing
-- **Fusion:** Learned gating mechanisms for semantic-geometric integration
-- **Losses:** L1, Gradient, SSIM, Boundary IoU, Freespace BCE
+- Processing and merging multiple RGB-D datasets  
+- Generating sparse depth and validity masks  
+- Training a baseline UNet depth completion model  
+- Evaluating RMSE/MAE metrics and visualizing predictions  
 
 ---
 
-## Installation
+## 📦 Environment Setup
 
-### Prerequisites
-
-- Python 3.10+
-- PyTorch 2.0+
-- CUDA (optional, for GPU training)
-
-### Setup
-
+### 1️⃣ Clone the repository
 ```bash
-# Clone repository
-git clone https://github.com/Devanshee-Vyas/semnav-dc.git
+git clone https://github.com/<your-username>/semnav-dc.git
 cd semnav-dc
+```
 
-# Install dependencies
+### 2️⃣ Create a Python environment
+```bash
+conda create -n semnav python=3.11 -y
+conda activate semnav
 pip install -r requirements.txt
+```
 
-# Install PyTorch (CPU version)
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+💡 On Apple Silicon (M1/M2/M3), PyTorch automatically uses MPS (Metal GPU) acceleration.
 
-# For GPU version
-# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+---
+
+## 🗂 Dataset Preparation
+
+### 🧩 SS4Blind Dataset
+
+Download from the official repository:  
+https://github.com/elnino9ykl/SS4Blind
+
+Required sub-datasets (must contain RGB + Depth):
+- rgbdss/
+- terrain/
+
+Optional semantic datasets:
+- crosswalk/
+- curb/
+- gardens_point/
+
+Place them in:
+```
+data/ss4blind/raw/
+├── rgbdss/
+├── terrain/
+├── crosswalk/
+├── curb/
+└── gardens_point/
 ```
 
 ---
 
-## Dataset Preparation
+### 🍎 ARKitScenes Dataset (Apple)
 
-### SS4Blind Dataset
-
-Place your raw SS4Blind dataset in `data/raw/ss4blind/` and run:
-
-```bash
-python scripts/preprocess_dataset.py \
-    --src data/raw/ss4blind \
-    --dst data/ss4blind \
-    --val_pct 0.10 \
-    --test_pct 0.10 \
-    --seed 1337 \
-    --target_hw 480 640
+1. Visit: https://machinelearning.apple.com/research/arkitscenes  
+   Agree to the license terms.  
+2. Download several `video_id` folders (e.g., `40753679`, `40753686`, `40776203`) from the Raw Dataset section.  
+3. Extract them into:
+```
+data/ss4blind/raw/arkitscenes/raw/Training/<video_id>/{vga_wide,lowres_depth,...}
 ```
 
-This will:
-- Process RGB and depth images
-- Handle multiple depth formats (PNG, NPY, PFM)
-- Create train/val/test splits (scene-based to prevent leakage)
-- Generate CSV index files
+⚠️ For a quick demo, downloading only one scene (~1 GB) is sufficient.
 
-### Validation
+---
 
-Verify dataset paths are correct:
+### 📦 Processed Dataset (Quick Start)
 
+To skip preprocessing, you can directly download the preprocessed dataset (~6.8 GB):
+
+[📥 Download Processed Dataset (Google Drive)](https://drive.google.com/file/d/XXXXXXXXXXXX/view?usp=sharing)
+
+After downloading, unzip it into:
+src/data/ss4blind/processed/
+
+Then you can start training directly:
 ```bash
-python scripts/validate_dataset.py \
-    --splits_dir data/ss4blind/splits \
-    --root data/ss4blind
+python -m src.train_unet \
+  --data_root src/data/ss4blind/processed \
+  --epochs 10 \
+  --batch_size 8 \
+  --lr 3e-4
 ```
 
 ---
 
-## Training
+## ⚙️ Data Preprocessing
 
-### UNet Baseline
-
+Combine SS4Blind and ARKitScenes into a unified processed format:
 ```bash
-python src/train.py --config configs/unet_baseline.yaml
+python -m scripts.preprocess_dataset   
+    --src data/ss4blind/raw   
+    --dst src/data/ss4blind/processed   
+    --target_hw 480 640   
+    --val_pct 0.10 
+    --test_pct 0.10   
+    --sparsity 0.03 
+    --save_dense_depth
 ```
 
-### SemNav-DC
-
-```bash
-python src/train.py --config configs/semnav_dc.yaml
+Output structure:
 ```
-
-**Training Configuration:**
-- Batch size: 2 (CPU), 8-16 (GPU)
-- Optimizer: Adam (lr=1e-3, weight decay=1e-4)
-- Epochs: 5-30
-- Mixed precision: Supported via AMP
+src/data/ss4blind/processed/
+├── images/{train,val,test}/
+├── depth_sparse/{train,val,test}/
+├── depth_valid_mask/{train,val,test}/
+├── depth/{train,val,test}/
+└── splits/train.csv, val.csv, test.csv
+```
 
 ---
 
-## Evaluation
+## 🧠 Training the Baseline (UNet)
 
+Train the UNet baseline model using the processed dataset:
 ```bash
-python src/evaluate.py \
-    --config configs/unet_baseline.yaml \
-    --ckpt checkpoints/ss4blind_unet/best_rmse.ckpt
+python -m src.train_unet   
+    --data_root src/data/ss4blind/processed   
+    --epochs 10   
+    --batch_size 8   
+    --lr 3e-4   
+    --outdir checkpoints/ss4blind_unet  
+    --subset_train 0 
+    --subset_val 0
 ```
 
-**Metrics Computed:**
-- Standard: RMSE, MAE, iRMSE, iMAE
-- Navigation-Specific: Free Space IoU, Obstacle Recall@2m
+- Automatically uses MPS or CPU  
+- Logs and best checkpoint are saved in `checkpoints/ss4blind_unet/`
 
 ---
 
-## Results
+## 📈 Generating Results
 
-### SS4Blind Dataset (Real-World Navigation)
+### 1️⃣ Plot Validation Curves
+```bash
+python -m scripts.plot_metrics
+```
+Outputs:
+- docs/figures/baseline_rmse.png  
+- docs/figures/baseline_mae.png
 
-| Model | RMSE (m) | MAE (m) | Free Space IoU | Obstacle Recall@2m |
-|-------|----------|---------|----------------|---------------------|
-| UNet Baseline | 0.848 | 0.409 | 0.979 | 0.003 |
-| SemNav-DC | TBD | TBD | TBD | TBD |
-
-*Training: 184 samples, Validation: 100 samples, Test: 100 samples*
-
-### Qualitative Results
-
-Sample predictions showing RGB input, sparse depth, prediction, and ground truth are saved in `results/` directory after evaluation.
+### 2️⃣ Export Visualization Panels
+```bash
+python -m scripts.export_panels
+```
+Creates qualitative examples in:
+```
+docs/figures/baseline_examples/panel_*.png
+```
+Each panel shows: RGB | Sparse | Predicted | Ground Truth
 
 ---
 
-## Project Structure
+## 🧪 Evaluate on Test Set
+```bash
+python -m scripts.eval_on_test
+```
+Example output:
+```
+TEST  RMSE=0.1327  MAE=0.0914
+```
 
+---
+
+## 📊 Baseline Metrics Summary
+
+| Split | RMSE (m) | MAE (m) |
+|:------|:---------:|:-------:|
+| Validation | 0.1245 | 0.0830 |
+| Test | 0.1327 | 0.0914 |
+
+Results are stored in:  
+docs/tables/baseline_metrics.csv
+
+---
+
+## 🧩 Quick Start Recap
+```bash
+# 1. Download datasets → data/ss4blind/raw/
+# 2. Preprocess
+python -m scripts.preprocess_dataset 
+    --src data/ss4blind/raw 
+    --dst src/data/ss4blind/processed 
+    --target_hw 480 640 
+    --sparsity 0.03 
+    --save_dense_depth
+# 3. Train baseline
+python -m src.train_unet 
+    --data_root src/data/ss4blind/processed 
+    --epochs 10 
+    --batch_size 8 
+    --lr 3e-4 
+    --outdir checkpoints/ss4blind_unet
+# 4. Visualize results
+python -m scripts.plot_metrics
+python -m scripts.export_panels
+python -m scripts.eval_on_test
+```
+
+---
+
+## 🚫 Git Ignore for Large Files
+
+Datasets and model checkpoints are not included in this repository.  
+Make sure `.gitignore` contains:
+```
+data/
+checkpoints/
+outputs/
+*.pth
+*.npy
+```
+
+---
+
+## 📁 Project Structure
 ```
 semnav-dc/
-├── configs/              # Experiment configurations
-│   ├── unet_baseline.yaml
-│   └── semnav_dc.yaml
-├── data/                 # Datasets (gitignored)
 ├── src/
-│   ├── data/            # Dataset loaders
-│   │   ├── ss4blind.py
-│   │   └── transforms.py
-│   ├── models/          # Architecture definitions
-│   │   ├── unet_baseline.py
-│   │   └── semnav_dc.py
-│   ├── losses/          # Loss functions
-│   │   ├── depth.py
-│   │   └── boundary.py
-│   ├── metrics/         # Evaluation metrics
-│   │   ├── depth.py
-│   │   └── navigation.py
-│   ├── utils/           # Utilities
-│   ├── train.py         # Training script
-│   └── evaluate.py      # Evaluation script
+│   ├── data/ss4blind_dataset.py
+│   ├── models/unet_baseline.py
+│   └── train_unet.py
 ├── scripts/
-│   ├── preprocess_dataset.py    # Dataset ingestion
-│   └── validate_dataset.py      # Path validation
-├── requirements.txt     # Python dependencies
-└── PROJECT_DOCUMENTATION.md  # Detailed technical documentation
+│   ├── preprocess_dataset.py
+│   ├── plot_metrics.py
+│   ├── export_panels.py
+│   └── eval_on_test.py
+├── checkpoints/
+├── docs/
+│   ├── figures/
+│   └── tables/
+├── requirements.txt
+└── README.md
 ```
 
 ---
 
-## Technical Documentation
+## 🏁 Final Deliverables
 
-For comprehensive technical details including:
-- Problem formulation and motivation
-- Architecture design and innovations
-- Loss function derivations
-- Experimental setup and analysis
+After completing the steps above, you will have:
 
-Please see [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md).
+✅ Trained baseline model → `checkpoints/ss4blind_unet/best.pth`  
+📈 Validation curves → `docs/figures/baseline_rmse.png`, `baseline_mae.png`  
+🖼 Visualization panels → `docs/figures/baseline_examples/panel_*.png`  
+📊 Metrics table → `docs/tables/baseline_metrics.csv`
 
----
-
-## Citation
-
-If you use this code in your research, please cite:
-
-```bibtex
-@misc{vyas2025semnav,
-  title={SemNav-DC: Semantic Depth Completion for Blind Navigation},
-  author={Vyas, Devanshee},
-  year={2025},
-  note={Deep Learning Course Project}
-}
-```
+This completes the UNet baseline reproduction for the SemNav-DC project.
 
 ---
 
-## License
-
-MIT License - See LICENSE file for details.
-
----
-
-## Acknowledgments
-
-- **Dataset:** SS4Blind RGB-D-SS for assistive navigation research
-- **Architectures:** UNet (Ronneberger et al., MICCAI 2015), ResNet (He et al., CVPR 2016), DeepLabV3 (Chen et al., arXiv 2017)
-- **Libraries:** PyTorch, timm, OpenCV
-
----
-
-## Contact
-
-**Author:** Devanshee Vyas  
-**Course:** Deep Learning, Semester 3  
-**GitHub:** [@Devanshee-Vyas](https://github.com/Devanshee-Vyas)
-
-For questions or collaboration opportunities, please open an issue on GitHub.
+✅ **How to use:**  
+Copy this entire text and save it as `README.md` in your project root.  
+Once pushed to GitHub, it will render beautifully with all emojis, headings, and code blocks.
